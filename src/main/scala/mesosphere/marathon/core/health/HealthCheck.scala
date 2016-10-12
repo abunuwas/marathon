@@ -1,7 +1,7 @@
-package mesosphere.marathon.core.health
+package mesosphere.marathon
+package core.health
 
 import com.wix.accord._
-import mesosphere.marathon.Protos
 import mesosphere.marathon.Protos.HealthCheckDefinition.Protocol
 import mesosphere.marathon.core.task.Task
 import mesosphere.marathon.state._
@@ -165,12 +165,12 @@ case class MesosCommandHealthCheck(
   interval: FiniteDuration = HealthCheck.DefaultInterval,
   timeout: FiniteDuration = HealthCheck.DefaultTimeout,
   maxConsecutiveFailures: Int = HealthCheck.DefaultMaxConsecutiveFailures,
-  command: Command)
+  command: Executable)
     extends HealthCheck with MesosHealthCheck {
   override def toProto: Protos.HealthCheckDefinition = {
     protoBuilder
       .setProtocol(Protos.HealthCheckDefinition.Protocol.COMMAND)
-      .setCommand(command.toProto)
+      .setCommand(Executable.toProto(command))
       .build
   }
 
@@ -181,7 +181,7 @@ case class MesosCommandHealthCheck(
       .setTimeoutSeconds(this.timeout.toSeconds.toDouble)
       .setConsecutiveFailures(this.maxConsecutiveFailures)
       .setGracePeriodSeconds(this.gracePeriod.toUnit(SECONDS))
-      .setCommand(this.command.toProto)
+      .setCommand(Executable.toProto(this.command))
       .build()
   }
 }
@@ -193,7 +193,7 @@ object MesosCommandHealthCheck {
       timeout = proto.getTimeoutSeconds.seconds,
       interval = proto.getIntervalSeconds.seconds,
       maxConsecutiveFailures = proto.getMaxConsecutiveFailures,
-      command = Command("").mergeFromProto(proto.getCommand)
+      command = Executable.mergeFromProto(proto.getCommand)
     )
 }
 

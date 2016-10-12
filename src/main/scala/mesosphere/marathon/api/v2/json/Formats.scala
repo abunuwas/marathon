@@ -1,4 +1,5 @@
-package mesosphere.marathon.api.v2.json
+package mesosphere.marathon
+package api.v2.json
 
 import mesosphere.marathon.Protos.Constraint
 import mesosphere.marathon.Protos.Constraint.Operator
@@ -741,9 +742,17 @@ trait HealthCheckFormats {
   implicit val MesosHttpHealthCheckFormat: Format[MesosHttpHealthCheck] =
     HttpHealthCheckFormatBuilder(MesosHttpHealthCheck.apply, unlift(MesosHttpHealthCheck.unapply))
 
+  implicit val ExecutableFormat: Format[Executable] = Format[Executable] (
+    Reads[Executable] { js => js.validate[Command].flatMap(cmd => JsSuccess[Executable](cmd)) },
+    Writes[Executable] {
+      case c: Command => CommandFormat.writes(c)
+      case e: ArgvList => throw SerializationFailedException("serialization of ArgvList not supported")
+    }
+  )
+
   implicit val MesosCommandHealthCheckFormat: Format[MesosCommandHealthCheck] = (
     BasicHealthCheckFormatBuilder ~
-    (__ \ "command").format[Command]
+    (__ \ "command").format[Executable]
   )(MesosCommandHealthCheck.apply, unlift(MesosCommandHealthCheck.unapply))
 
   implicit val MesosTcpHealthCheckFormat: Format[MesosTcpHealthCheck] =
