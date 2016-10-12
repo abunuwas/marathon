@@ -739,8 +739,12 @@ trait HealthCheckFormats {
     HealthCheckWithPortsFormatBuilder(MarathonTcpHealthCheck.apply, unlift(MarathonTcpHealthCheck.unapply))
 
   // Mesos health checks formats
-  implicit val MesosHttpHealthCheckFormat: Format[MesosHttpHealthCheck] =
-    HttpHealthCheckFormatBuilder(MesosHttpHealthCheck.apply, unlift(MesosHttpHealthCheck.unapply))
+  implicit val MesosHttpHealthCheckFormat: Format[MesosHttpHealthCheck] = {
+    (
+      HttpHealthCheckFormatBuilder ~
+      (__ \ "delay").formatNullable[Long].withDefault(HealthCheck.DefaultDelay.toSeconds).asSeconds
+    )(MesosHttpHealthCheck.apply, unlift(MesosHttpHealthCheck.unapply))
+  }
 
   implicit val ExecutableFormat: Format[Executable] = Format[Executable] (
     Reads[Executable] { js => js.validate[Command].flatMap(cmd => JsSuccess[Executable](cmd)) },
@@ -752,11 +756,16 @@ trait HealthCheckFormats {
 
   implicit val MesosCommandHealthCheckFormat: Format[MesosCommandHealthCheck] = (
     BasicHealthCheckFormatBuilder ~
+    (__ \ "delay").formatNullable[Long].withDefault(HealthCheck.DefaultDelay.toSeconds).asSeconds ~
     (__ \ "command").format[Executable]
   )(MesosCommandHealthCheck.apply, unlift(MesosCommandHealthCheck.unapply))
 
-  implicit val MesosTcpHealthCheckFormat: Format[MesosTcpHealthCheck] =
-    HealthCheckWithPortsFormatBuilder(MesosTcpHealthCheck.apply, unlift(MesosTcpHealthCheck.unapply))
+  implicit val MesosTcpHealthCheckFormat: Format[MesosTcpHealthCheck] = {
+    (
+      HealthCheckWithPortsFormatBuilder ~
+      (__ \ "delay").formatNullable[Long].withDefault(HealthCheck.DefaultDelay.toSeconds).asSeconds
+    )(MesosTcpHealthCheck.apply, unlift(MesosTcpHealthCheck.unapply))
+  }
 
   implicit val HealthCheckFormat: Format[HealthCheck] = Format[HealthCheck] (
     new Reads[HealthCheck] {

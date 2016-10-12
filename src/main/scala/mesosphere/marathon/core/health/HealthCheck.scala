@@ -60,6 +60,10 @@ sealed trait MesosHealthCheck extends HealthCheck {
   def interval: FiniteDuration
   def timeout: FiniteDuration
   def maxConsecutiveFailures: Int
+  def delay: FiniteDuration
+
+  override protected def protoBuilder: Protos.HealthCheckDefinition.Builder =
+    super.protoBuilder.setDelaySeconds(delay.toSeconds.toInt)
 
   def toMesos(portAssignments: Seq[PortAssignment] = Seq.empty): MesosProtos.HealthCheck
 }
@@ -165,6 +169,7 @@ case class MesosCommandHealthCheck(
   interval: FiniteDuration = HealthCheck.DefaultInterval,
   timeout: FiniteDuration = HealthCheck.DefaultTimeout,
   maxConsecutiveFailures: Int = HealthCheck.DefaultMaxConsecutiveFailures,
+  delay: FiniteDuration = HealthCheck.DefaultDelay,
   command: Executable)
     extends HealthCheck with MesosHealthCheck {
   override def toProto: Protos.HealthCheckDefinition = {
@@ -181,6 +186,7 @@ case class MesosCommandHealthCheck(
       .setTimeoutSeconds(this.timeout.toSeconds.toDouble)
       .setConsecutiveFailures(this.maxConsecutiveFailures)
       .setGracePeriodSeconds(this.gracePeriod.toUnit(SECONDS))
+      .setDelaySeconds(this.delay.toUnit(SECONDS))
       .setCommand(Executable.toProto(this.command))
       .build()
   }
@@ -193,6 +199,7 @@ object MesosCommandHealthCheck {
       timeout = proto.getTimeoutSeconds.seconds,
       interval = proto.getIntervalSeconds.seconds,
       maxConsecutiveFailures = proto.getMaxConsecutiveFailures,
+      delay = proto.getDelaySeconds.seconds,
       command = Executable.mergeFromProto(proto.getCommand)
     )
 }
@@ -205,7 +212,8 @@ case class MesosHttpHealthCheck(
   portIndex: Option[Int] = HealthCheckWithPort.DefaultPortIndex,
   port: Option[Int] = HealthCheckWithPort.DefaultPort,
   path: Option[String] = MarathonHttpHealthCheck.DefaultPath,
-  protocol: Protocol = MesosHttpHealthCheck.DefaultProtocol)
+  protocol: Protocol = MesosHttpHealthCheck.DefaultProtocol,
+  delay: FiniteDuration = HealthCheck.DefaultDelay)
     extends HealthCheck with MesosHealthCheck with MesosHealthCheckWithPorts {
   require(protocol == Protocol.MESOS_HTTP || protocol == Protocol.MESOS_HTTPS)
 
@@ -233,6 +241,7 @@ case class MesosHttpHealthCheck(
       .setTimeoutSeconds(this.timeout.toSeconds.toDouble)
       .setConsecutiveFailures(this.maxConsecutiveFailures)
       .setGracePeriodSeconds(this.gracePeriod.toUnit(SECONDS))
+      .setDelaySeconds(this.delay.toUnit(SECONDS))
       .setHttp(httpInfoBuilder)
       .build()
   }
@@ -248,6 +257,7 @@ object MesosHttpHealthCheck {
       timeout = proto.getTimeoutSeconds.seconds,
       interval = proto.getIntervalSeconds.seconds,
       maxConsecutiveFailures = proto.getMaxConsecutiveFailures,
+      delay = proto.getDelaySeconds.seconds,
       path = if (proto.hasPath) Some(proto.getPath) else None,
       portIndex =
       if (proto.hasPortIndex)
@@ -267,7 +277,8 @@ case class MesosTcpHealthCheck(
   timeout: FiniteDuration = HealthCheck.DefaultTimeout,
   maxConsecutiveFailures: Int = HealthCheck.DefaultMaxConsecutiveFailures,
   portIndex: Option[Int] = HealthCheckWithPort.DefaultPortIndex,
-  port: Option[Int] = HealthCheckWithPort.DefaultPort)
+  port: Option[Int] = HealthCheckWithPort.DefaultPort,
+  delay: FiniteDuration = HealthCheck.DefaultDelay)
     extends HealthCheck with MesosHealthCheck with MesosHealthCheckWithPorts {
   override def toProto: Protos.HealthCheckDefinition = {
     val builder = protoBuilder.setProtocol(Protos.HealthCheckDefinition.Protocol.MESOS_TCP)
@@ -287,6 +298,7 @@ case class MesosTcpHealthCheck(
       .setTimeoutSeconds(this.timeout.toSeconds.toDouble)
       .setConsecutiveFailures(this.maxConsecutiveFailures)
       .setGracePeriodSeconds(this.gracePeriod.toUnit(SECONDS))
+      .setDelaySeconds(this.delay.toUnit(SECONDS))
       .setTcp(tcpInfoBuilder)
       .build()
   }
@@ -299,6 +311,7 @@ object MesosTcpHealthCheck {
       timeout = proto.getTimeoutSeconds.seconds,
       interval = proto.getIntervalSeconds.seconds,
       maxConsecutiveFailures = proto.getMaxConsecutiveFailures,
+      delay = proto.getDelaySeconds.seconds,
       portIndex =
       if (proto.hasPortIndex)
         Some(proto.getPortIndex)
@@ -320,6 +333,7 @@ object HealthCheck {
   // As soon as an application is started (before a task is launched), we start the health checks for this app.
   // We optimistically set a low value here, for tasks that start really fast
   val DefaultFirstHealthCheckAfter = 5.seconds
+  val DefaultDelay = 15.seconds
 
   implicit val Validator: Validator[HealthCheck] = new Validator[HealthCheck] {
     override def apply(hc: HealthCheck): Result = {
