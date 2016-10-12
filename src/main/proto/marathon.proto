@@ -49,6 +49,7 @@ message HealthCheckDefinition {
   optional mesos.CommandInfo command = 8;
   optional bool ignoreHttp1xx = 9 [default = false];
   optional uint32 port = 10;
+  optional uint32 delaySeconds = 11 [default = 15];
 }
 
 message ReadinessCheckDefinition {
