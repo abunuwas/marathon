@@ -3,6 +3,7 @@ package raml
 
 import mesosphere.marathon.Protos.HealthCheckDefinition
 import mesosphere.marathon.core.health.{ MesosCommandHealthCheck, MesosHealthCheck, MesosHttpHealthCheck, MesosTcpHealthCheck }
+import mesosphere.marathon.core.pod.PodDefinition
 import mesosphere.marathon.state.{ ArgvList, Command, Executable }
 
 import scala.concurrent.duration._
@@ -21,38 +22,48 @@ trait HealthCheckConversion {
     }
   }
 
-  implicit val healthCheckRamlReader: Reads[HealthCheck, MesosHealthCheck] = Reads {
-    case HealthCheck(Some(httpCheck), None, None, gracePeriodSec, intervalSec, maxConFailures, timeoutSec, delaySec) =>
-      MesosHttpHealthCheck(
-        gracePeriod = gracePeriodSec.seconds,
-        interval = intervalSec.seconds,
-        timeout = timeoutSec.seconds,
-        maxConsecutiveFailures = maxConFailures,
-        delay = delaySec.seconds,
-        path = httpCheck.path,
-        protocol = httpCheck.scheme.map(scheme => Raml.fromRaml(scheme)).getOrElse(HealthCheckDefinition.Protocol.HTTP)
-      // TODO(pods) set portName once MesosHttpHealthCheck supports it
-      )
-    case HealthCheck(None, Some(tcpCheck), None, gracePeriodSec, intervalSec, maxConFailures, timeoutSec, delaySec) =>
-      MesosTcpHealthCheck(
-        gracePeriod = gracePeriodSec.seconds,
-        interval = intervalSec.seconds,
-        timeout = timeoutSec.seconds,
-        maxConsecutiveFailures = maxConFailures,
-        delay = delaySec.seconds
-      // TODO(pods) set portName once MesosHttpHealthCheck supports it
-      )
-    case HealthCheck(None, None, Some(execCheck), gracePeriodSec, intervalSec, maxConFailures, timeoutSec, delaySec) =>
-      MesosCommandHealthCheck(
-        gracePeriod = gracePeriodSec.seconds,
-        interval = intervalSec.seconds,
-        timeout = timeoutSec.seconds,
-        maxConsecutiveFailures = maxConFailures,
-        delay = delaySec.seconds,
-        command = Raml.fromRaml(execCheck)
-      )
-    case _ =>
-      throw new IllegalArgumentException("illegal RAML health check")
+  implicit val healthCheckRamlReader: Reads[(PodDefinition, HealthCheck), MesosHealthCheck] = Reads { src =>
+    val (pod, check) = src
+
+    def portIndex(endpointName: String): Option[Int] = {
+      val i = pod.endpoints.indexWhere(_.name == endpointName)
+      if (i == -1) throw new IllegalStateException(s"endpoint named $endpointName not defined in pod ${pod.id}")
+      else Some(i)
+    }
+
+    check match {
+      case HealthCheck(Some(httpCheck), None, None, gracePeriod, interval, maxConFailures, timeout, delay) =>
+        MesosHttpHealthCheck(
+          gracePeriod = gracePeriod.seconds,
+          interval = interval.seconds,
+          timeout = timeout.seconds,
+          maxConsecutiveFailures = maxConFailures,
+          delay = delay.seconds,
+          path = httpCheck.path,
+          protocol = httpCheck.scheme.map(Raml.fromRaml(_)).getOrElse(HealthCheckDefinition.Protocol.HTTP),
+          portIndex = portIndex(httpCheck.endpoint)
+        )
+      case HealthCheck(None, Some(tcpCheck), None, gracePeriod, interval, maxConFailures, timeout, delay) =>
+        MesosTcpHealthCheck(
+          gracePeriod = gracePeriod.seconds,
+          interval = interval.seconds,
+          timeout = timeout.seconds,
+          maxConsecutiveFailures = maxConFailures,
+          delay = delay.seconds,
+          portIndex = portIndex(tcpCheck.endpoint)
+        )
+      case HealthCheck(None, None, Some(execCheck), gracePeriod, interval, maxConFailures, timeout, delay) =>
+        MesosCommandHealthCheck(
+          gracePeriod = gracePeriod.seconds,
+          interval = interval.seconds,
+          timeout = timeout.seconds,
+          maxConsecutiveFailures = maxConFailures,
+          delay = delay.seconds,
+          command = Raml.fromRaml(execCheck)
+        )
+      case _ =>
+        throw new IllegalStateException("illegal RAML HealthCheck: expected one of http, tcp or exec checks")
+    }
   }
 }
 
