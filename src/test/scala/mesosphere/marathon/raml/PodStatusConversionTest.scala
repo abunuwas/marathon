@@ -2,6 +2,7 @@ package mesosphere.marathon
 package raml
 
 import mesosphere.marathon.core.base.ConstantClock
+import mesosphere.marathon.core.health.{ MesosCommandHealthCheck, MesosHttpHealthCheck }
 import mesosphere.marathon.core.instance.{ Instance, InstanceStatus }
 import mesosphere.marathon.core.pod.{ ContainerNetwork, MesosContainer, PodDefinition }
 import mesosphere.marathon.core.task.Task
@@ -394,7 +395,7 @@ object PodStatusConversionTest {
           Endpoint(name = "web", containerPort = Some(80)),
           Endpoint(name = "admin", containerPort = Some(90), hostPort = Some(0))
         ),
-        healthCheck = Some(HealthCheck(http = Some(HttpHealthCheck(endpoint = "web", path = Some("/ping")))))
+        healthCheck = Some(MesosHttpHealthCheck(portIndex = Some(0), path = Some("/ping")))
       )
     ),
     networks = Seq(ContainerNetwork(name = "dcos"), ContainerNetwork("bigdog"))
@@ -506,8 +507,7 @@ object PodStatusConversionTest {
   def withCommandLineHealthChecks(pod: PodDefinition): PodDefinition = pod.copy(
     // swap any endpoint health checks for a command-line health check
     containers = basicOneContainerPod.containers.map { ct =>
-      ct.copy(healthCheck = Some(HealthCheck(http = None, tcp = None, exec = Some(CommandHealthCheck(ShellCommand(
-        "echo this is a health check command"
-      ))))))
+      ct.copy(
+        healthCheck = Some(MesosCommandHealthCheck(command = state.Command("echo this is a health check command"))))
     })
 }

@@ -1,12 +1,11 @@
-package mesosphere.marathon.raml
+package mesosphere.marathon
+package raml
 
 import mesosphere.marathon.core.pod
 import mesosphere.marathon.core.pod.PodDefinition
 import mesosphere.marathon.core.pod.PodDefinition._
-import mesosphere.marathon.{ Protos, state }
 import mesosphere.marathon.state.{ PathId, Timestamp }
 
-import scala.collection.immutable.Seq
 import scala.concurrent.duration._
 
 trait PodConversion extends NetworkConversion with ConstraintConversion
@@ -35,7 +34,10 @@ trait PodConversion extends NetworkConversion with ConstraintConversion
       podDef.scheduling.flatMap(_.placement.map(_.constraints.map(Raml.fromRaml(_)).toSet))
         .getOrElse(Set.empty[Protos.Constraint])
 
-    new PodDefinition(
+    // container health check conversion requires that we build a partially-complete pod definition,
+    // and in a second pass perform the conversion of any health checks
+
+    val partialPod = new PodDefinition(
       id = PathId(podDef.id).canonicalPath(),
       user = podDef.user,
       env = Raml.fromRaml(podDef.environment),
@@ -51,6 +53,17 @@ trait PodConversion extends NetworkConversion with ConstraintConversion
       networks = networks,
       backoffStrategy = backoffStrategy,
       upgradeStrategy = upgradeStrategy
+    )
+
+    assume(
+      podDef.containers.size == partialPod.containers.size,
+      s"expected that number of raml containers ${podDef.containers.size} equals " +
+        s"the number of internal containers ${partialPod.containers.size}")
+
+    partialPod.copy(
+      containers = podDef.containers.zip(partialPod.containers).map { entry =>
+        entry._2.copy(healthCheck = entry._1.healthCheck.map(check => Raml.fromRaml((partialPod, check))))
+      }
     )
   }
 
@@ -75,7 +88,7 @@ trait PodConversion extends NetworkConversion with ConstraintConversion
       id = pod.id.toString,
       version = Some(pod.version.toOffsetDateTime),
       user = pod.user,
-      containers = pod.containers.map(Raml.toRaml(_)),
+      containers = pod.containers.map(ct => Raml.toRaml((pod, ct))),
       environment = Raml.toRaml(pod.env),
       labels = pod.labels,
       scaling = Some(scalingPolicy),

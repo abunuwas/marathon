@@ -1,11 +1,12 @@
 package mesosphere.mesos
 
+import mesosphere.marathon.core.health.{ MesosCommandHealthCheck, MesosHealthCheck }
 import mesosphere.marathon.core.instance.Instance
 import mesosphere.marathon.core.pod._
 import mesosphere.marathon.core.task.Task
 import mesosphere.marathon.plugin.task.RunSpecTaskProcessor
 import mesosphere.marathon.raml
-import mesosphere.marathon.state.{ EnvVarString, PathId, Timestamp }
+import mesosphere.marathon.state.{ EnvVarString, PathId, PortAssignment, Timestamp }
 import mesosphere.marathon.stream._
 import mesosphere.marathon.tasks.PortsMatch
 import mesosphere.mesos.ResourceMatcher.ResourceSelector
@@ -373,70 +374,32 @@ object TaskGroupBuilder {
   }
 
   private[this] def computeHealthCheck(
-    healthCheck: raml.HealthCheck,
+    healthCheck: MesosHealthCheck,
     podDefinition: PodDefinition,
-    hostPorts: Seq[Option[Int]]): mesos.HealthCheck.Builder = {
+    hostPorts: Seq[Option[Int]]): mesos.HealthCheck = {
 
-    val builder = mesos.HealthCheck.newBuilder
-    builder.setDelaySeconds(healthCheck.delaySeconds.toDouble)
-    builder.setGracePeriodSeconds(healthCheck.gracePeriodSeconds.toDouble)
-    builder.setIntervalSeconds(healthCheck.intervalSeconds.toDouble)
-    builder.setConsecutiveFailures(healthCheck.maxConsecutiveFailures)
-    builder.setTimeoutSeconds(healthCheck.timeoutSeconds.toDouble)
+    healthCheck match {
+      case _: MesosCommandHealthCheck =>
+        healthCheck.toMesos()
+      case _ =>
+        assume(
+          podDefinition.endpoints.size == hostPorts.size,
+          s"Endpoints without resolved host ports: ${podDefinition.endpoints.size} hostPorts: ${hostPorts.size}")
 
-    lazy val hostPortsByEndpoint: Map[String, Option[Int]] = {
-      podDefinition.containers.flatMap(_.endpoints.map(_.name)).zip(hostPorts).toMap.withDefaultValue(None)
+        val isHostModeNetworking = podDefinition.networks.contains(HostNetwork)
+
+        healthCheck.toMesos(podDefinition.endpoints.zip(hostPorts).map { entry =>
+          PortAssignment(
+            portName = Some(entry._1.name),
+            hostPort = entry._2.find(_ => isHostModeNetworking),
+            containerPort = entry._1.containerPort.find(_ => !isHostModeNetworking),
+            // we don't need these for health checks proto generation, presumably because we can't definitively know,
+            // in all cases, the full network address of the health check until the task is actually launched.
+            effectiveIpAddress = None,
+            effectivePort = 0
+          )
+        })
     }
-
-    assume(
-      hostPorts.size == hostPortsByEndpoint.size,
-      s"Endpoints without resolved host ports: ${hostPorts.size} byEndpoint: ${hostPortsByEndpoint.size}")
-
-    healthCheck.exec.foreach { command =>
-      builder.setType(mesos.HealthCheck.Type.COMMAND)
-
-      val commandInfo = mesos.CommandInfo.newBuilder
-
-      command.command match {
-        case raml.ShellCommand(shell) =>
-          commandInfo.setShell(true)
-          commandInfo.setValue(shell)
-        case raml.ArgvCommand(argv) =>
-          commandInfo.setShell(false)
-          commandInfo.addAllArguments(argv)
-          argv.headOption.foreach(commandInfo.setValue)
-      }
-
-      builder.setCommand(commandInfo)
-    }
-
-    val isHostModeNetworking = podDefinition.networks.contains(HostNetwork)
-
-    healthCheck.http.foreach { http =>
-      builder.setType(mesos.HealthCheck.Type.HTTP)
-      val httpCheckInfo = mesos.HealthCheck.HTTPCheckInfo.newBuilder
-      if (isHostModeNetworking)
-        hostPortsByEndpoint(http.endpoint).foreach(httpCheckInfo.setPort)
-      else
-        podDefinition.containers.flatMap(_.endpoints).find(_.name == http.endpoint)
-          .flatMap(_.containerPort).foreach(httpCheckInfo.setPort)
-      http.scheme.foreach(scheme => httpCheckInfo.setScheme(scheme.value))
-      http.path.foreach(httpCheckInfo.setPath)
-      builder.setHttp(httpCheckInfo)
-    }
-
-    healthCheck.tcp.foreach { tcp =>
-      builder.setType(mesos.HealthCheck.Type.TCP)
-      val tcpCheckInfo = mesos.HealthCheck.TCPCheckInfo.newBuilder
-      if (isHostModeNetworking)
-        hostPortsByEndpoint(tcp.endpoint).foreach(tcpCheckInfo.setPort)
-      else
-        podDefinition.containers.flatMap(_.endpoints).find(_.name == tcp.endpoint)
-          .flatMap(_.containerPort).foreach(tcpCheckInfo.setPort)
-      builder.setTcp(tcpCheckInfo)
-    }
-
-    builder
   }
 
   /**
