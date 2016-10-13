@@ -15,6 +15,12 @@ trait HealthCheckConversion {
     case HttpScheme.Https => HealthCheckDefinition.Protocol.MESOS_HTTPS
   }
 
+  implicit val httpSchemeRamlWriter: Writes[HealthCheckDefinition.Protocol, HttpScheme] = Writes {
+    case HealthCheckDefinition.Protocol.MESOS_HTTP => HttpScheme.Http
+    case HealthCheckDefinition.Protocol.MESOS_HTTPS => HttpScheme.Https
+    case p => throw new IllegalArgumentException(s"cannot convert health-check protocol $p to raml")
+  }
+
   implicit val commandHealthCheckRamlReader: Reads[CommandHealthCheck, Executable] = Reads { commandHealthCheck =>
     commandHealthCheck.command match {
       case sc: ShellCommand => Command(sc.shell)
@@ -63,6 +69,46 @@ trait HealthCheckConversion {
         )
       case _ =>
         throw new IllegalStateException("illegal RAML HealthCheck: expected one of http, tcp or exec checks")
+    }
+  }
+
+  implicit val healthCheckRamlWriter: Writes[(PodDefinition, MesosHealthCheck), HealthCheck] = Writes { src =>
+    val (pod, check) = src
+    def requiredField[T](msg: String): T = throw new IllegalStateException(msg)
+    def endpointAt(portIndex: Option[Int]): String = portIndex
+      .fold(requiredField[String](s"portIndex missing for health-check with pod ${pod.id}")){ idx =>
+        pod.endpoints(idx).name
+      }
+    val partialCheck = HealthCheck(
+      gracePeriodSeconds = check.gracePeriod.toSeconds,
+      intervalSeconds = check.interval.toSeconds.toInt,
+      maxConsecutiveFailures = check.maxConsecutiveFailures,
+      timeoutSeconds = check.timeout.toSeconds.toInt,
+      delaySeconds = check.delay.toSeconds.toInt
+    )
+    check match {
+      case httpCheck: MesosHttpHealthCheck =>
+        partialCheck.copy(
+          http = Some(HttpHealthCheck(
+            endpoint = endpointAt(httpCheck.portIndex),
+            path = httpCheck.path,
+            scheme = Some(Raml.toRaml(httpCheck.protocol))))
+        )
+      case tcpCheck: MesosTcpHealthCheck =>
+        partialCheck.copy(
+          tcp = Some(TcpHealthCheck(
+            endpoint = endpointAt(tcpCheck.portIndex)
+          ))
+        )
+      case cmdCheck: MesosCommandHealthCheck =>
+        partialCheck.copy(
+          exec = Some(CommandHealthCheck(
+            command = cmdCheck.command match {
+              case cmd: state.Command => ShellCommand(cmd.value)
+              case argv: state.ArgvList => ArgvCommand(argv.value)
+            }
+          ))
+        )
     }
   }
 }
