@@ -331,6 +331,8 @@ object Task {
         ))
         TaskUpdateEffect.Update(newState = updatedTask)
 
+      //case TaskUpdateOperation.MesosUpdate(InstanceStatus.Unreachable, mesosStatus, now) if hasExpired =>
+
       // The Terminal extractor applies specific logic e.g. when an Unreachable task becomes Gone
       case TaskUpdateOperation.MesosUpdate(newStatus: Terminal, mesosStatus, _) =>
         val updated = copy(status = status.copy(
