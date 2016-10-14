@@ -65,15 +65,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskRunning().getInstance()
       val origUpdate = TaskStatusUpdateTestHelper.killing(instance)
       val status = origUpdate.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the the MesosStatusUpdateEvent to the stateOpProcessor" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the the MesosStatusUpdateEvent to the stateOpProcessor" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -82,17 +82,17 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskRunning().getInstance()
       val update = TaskStatusUpdateTestHelper.failed(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Expunge(instance, events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in {
         verify(f.taskTracker).instance(instance.instanceId)
       }
-      "pass the TASK_FAILED update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_FAILED update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -101,15 +101,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskRunning().getInstance()
       val update = TaskStatusUpdateTestHelper.gone(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Expunge(instance, events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_GONE update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_GONE update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -118,15 +118,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskStarting().getInstance()
       val update = TaskStatusUpdateTestHelper.dropped(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Expunge(instance, events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_DROPPED update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_DROPPED update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -135,15 +135,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskStaged().getInstance()
       val update = TaskStatusUpdateTestHelper.dropped(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Expunge(instance, events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_DROPPED update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_DROPPED update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -152,10 +152,10 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskStarting().getInstance()
       val update = TaskStatusUpdateTestHelper.unreachable(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
@@ -163,7 +163,7 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
         verify(f.taskTracker).instance(instance.instanceId)
       }
       "pass the TASK_UNREACHABLE update" in {
-        verify(f.stateOpProcessor).process(expectedTaskStateOp)
+        verify(f.stateOpProcessor).process(instanceUpdateOp)
       }
     }
 
@@ -171,15 +171,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskStaged().getInstance()
       val update = TaskStatusUpdateTestHelper.unreachable(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_UNREACHABLE update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_UNREACHABLE update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -188,15 +188,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskRunning().getInstance()
       val update = TaskStatusUpdateTestHelper.unreachable(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_UNREACHABLE update" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_UNREACHABLE update" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }
@@ -205,15 +205,15 @@ class TaskStatusUpdateProcessorImplTest extends UnitTest {
       val instance = TestInstanceBuilder.newBuilder(appId).addTaskUnreachable().getInstance()
       val update = TaskStatusUpdateTestHelper.unknown(instance)
       val status = update.status
-      val expectedTaskStateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
+      val instanceUpdateOp = InstanceUpdateOperation.MesosUpdate(instance, status, f.clock.now())
 
       f.taskTracker.instance(instance.instanceId) returns Future.successful(Some(instance))
-      f.stateOpProcessor.process(expectedTaskStateOp) returns Future.successful(InstanceUpdateEffect.Update(instance, Some(instance), events = Nil))
+      f.stateOpProcessor.process(instanceUpdateOp) returns Future.successful(InstanceUpdateEffect.Expunge(instance, events = Nil))
 
       f.updateProcessor.publish(status).futureValue
 
       "load the task in the task tracker" in { verify(f.taskTracker).instance(instance.instanceId) }
-      "pass the TASK_UNKNOWN upate" in { verify(f.stateOpProcessor).process(expectedTaskStateOp) }
+      "pass the TASK_UNKNOWN upate" in { verify(f.stateOpProcessor).process(instanceUpdateOp) }
       "acknowledge the update" in { verify(f.schedulerDriver).acknowledgeStatusUpdate(status) }
       "not do anything else" in { f.verifyNoMoreInteractions() }
     }

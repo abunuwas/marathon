@@ -414,7 +414,6 @@ class InstanceUpdateOpResolverTest
     stateChange shouldBe a[InstanceUpdateEffect.Update]
     val updateEffect = stateChange.asInstanceOf[InstanceUpdateEffect.Update]
     updateEffect.events should have size 2
-    //TODO: Verify events
 
     And("there are no more interactions")
     f.verifyNoMoreInteractions()
@@ -441,7 +440,6 @@ class InstanceUpdateOpResolverTest
     stateChange shouldBe a[InstanceUpdateEffect.Update]
     val updateEffect = stateChange.asInstanceOf[InstanceUpdateEffect.Update]
     updateEffect.events should have size 2
-    //TODO: Verify events
 
     And("there are no more interactions")
     f.verifyNoMoreInteractions()
@@ -468,7 +466,6 @@ class InstanceUpdateOpResolverTest
     stateChange shouldBe a[InstanceUpdateEffect.Update]
     val updateEffect = stateChange.asInstanceOf[InstanceUpdateEffect.Update]
     updateEffect.events should have size 2
-    //TODO: Verify events
 
     And("there are no more interactions")
     f.verifyNoMoreInteractions()

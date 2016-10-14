@@ -82,6 +82,7 @@ digraph task_status_fsm {
     start -> "CREATED\n(Marathon Only)";
     "CREATED\n(Marathon Only)" -> ERROR;
     "CREATED\n(Marathon Only)" -> STAGING;
+    "CREATED\n(Marathon Only)" -> RUNNING;
     "CREATED\n(Marathon Only)" -> DROPPED;
     STAGING -> STARTING;
     STAGING -> DROPPED;
