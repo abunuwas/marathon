@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import mesosphere.marathon.state.Timestamp
 import mesosphere.marathon.core.task.Task
 import org.apache.mesos.Protos.TaskStatus.Reason
-import org.apache.mesos.Protos.{ TaskState, TaskStatus }
+import org.apache.mesos.Protos.{TaskState, TaskStatus, TimeInfo}
 
 object MesosTaskStatusTestHelper {
   def mesosStatus(
@@ -41,5 +41,10 @@ object MesosTaskStatusTestHelper {
   def killed(taskId: Task.Id = Task.Id(UUID.randomUUID().toString)) = mesosStatus(state = TaskState.TASK_KILLED, taskId = taskId)
   def killing(taskId: Task.Id = Task.Id(UUID.randomUUID().toString)) = mesosStatus(state = TaskState.TASK_KILLING, taskId = taskId)
   def unknown(taskId: Task.Id = Task.Id(UUID.randomUUID().toString)) = mesosStatus(state = TaskState.TASK_UNKNOWN, taskId = taskId)
-  def unreachable(taskId: Task.Id = Task.Id(UUID.randomUUID().toString)) = mesosStatus(state = TaskState.TASK_UNREACHABLE, taskId = taskId)
+  def unreachable(taskId: Task.Id = Task.Id(UUID.randomUUID().toString), since: Timestamp = Timestamp.zero) = {
+    val time = TimeInfo.newBuilder().setNanoseconds(since.toDateTime.getMillis * 1000000)
+    mesosStatus(state = TaskState.TASK_UNREACHABLE, taskId = taskId).toBuilder
+        .setUnreachableTime(time)
+        .build()
+  }
 }
