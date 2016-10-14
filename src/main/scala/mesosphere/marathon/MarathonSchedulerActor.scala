@@ -515,7 +515,7 @@ class SchedulerActions(
   def scale(runSpec: RunSpec): Unit = {
     import SchedulerActions._
 
-    def inQueueOrRunning(t: Instance) = t.isCreated || t.isRunning || t.isStaging || t.isStarting || t.isKilling
+    def inQueueOrRunning(t: Instance) = t.isCreated || t.isRunning || t.isStaging || t.isStarting || t.isKilling || t.isUnreachable
 
     val launchedCount = instanceTracker.countSpecInstancesSync(runSpec.id, inQueueOrRunning)
 

@@ -26,16 +26,14 @@ class ScaleAppUpdateStepImpl @Inject() (
   override def process(update: InstanceChange): Future[Done] = {
     // TODO(PODS): it should be up to a tbd TaskUnreachableBehavior how to handle Unreachable
     update.status match {
-      case InstanceStatus.Reserved | InstanceStatus.Unreachable | InstanceStatus.Terminal(_) =>
+      // only dispatch ScaleRunSpec if last state was not terminal and current new state is terminal
+      case InstanceStatus.Terminal(_) if update.lastState.forall(!_.status.isTerminal) =>
         val runSpecId = update.runSpecId
         val instanceId = update.id
         val state = update.status
         log.info(s"initiating a scale check for runSpec [$runSpecId] due to [$instanceId] $state")
         // TODO(PODS): we should rename the Message and make the SchedulerActor generic
-        // only dispatch ScaleRunSpec if last state was not terminal and current new state is terminal
-        if (update.lastState.forall(!_.status.isTerminal) && update.status.isTerminal) {
-          schedulerActor ! ScaleRunSpec(runSpecId)
-        }
+        schedulerActor ! ScaleRunSpec(runSpecId)
 
       case _ =>
       // nothing
